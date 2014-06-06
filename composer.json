@@ -1,0 +1,21 @@
+{
+    "name": "ropendev/pdomodel",
+    "description": "PDOModel is a simple and light PHP class to maintain database, table and data easily.",
+    "keywords": ["database", "pdo", "mysql", "sqlite"],
+    "homepage": "http://www.robin-d.fr/",
+    "license": "MIT",
+    "require": {
+        "php": ">=5.3.0"
+     },
+     "authors": [
+        {
+            "name": "Robin",
+            "email": "contact@robin-d.fr"
+        }
+    ],
+    "autoload": {
+        "psr-4": {
+            "rOpenDev\\PDOModel\\": ""
+        }
+    }
+}
