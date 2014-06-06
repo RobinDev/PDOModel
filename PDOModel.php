@@ -10,7 +10,7 @@ class PDOModel Extends PDO {
 	public $rows = '';
 	public $tableInRows = array();
 
-	private $config = array(
+	protected $config = array(
 		'dsn'=>'mysql',
 		'user'=>'root',
 		'password'=>'',
