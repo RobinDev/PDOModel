@@ -12,8 +12,8 @@ class PDOModel Extends PDO {
 
 	protected $config = array(
 		'dsn'=>'mysql',
-		'user'=>'root',
-		'password'=>'',
+		'user'=>userMysql,
+		'password'=>passwordMysql,
 		'host'=>'localhost',
 		'databasePath'=>'data/',
 		'alwaysCreateTable'=> true,
@@ -151,7 +151,7 @@ class PDOModel Extends PDO {
 								$cTable .= ' REFERENCES '.$vv;
 							}
 							else {
-								$cTable .= ' '.strtoupper($vv));
+								$cTable .= ' '.strtoupper($vv);
 							}
 						}
 						$cTable .= ','.CHR(10);
@@ -160,7 +160,10 @@ class PDOModel Extends PDO {
 				}
 				$cTable = trim($cTable, ','.CHR(10)).')'.(isset($table['#engine']) ? ' ENGINE='.$table['#engine'] : '').' DEFAULT CHARSET=utf8;';
 				//dbv($cTable, false);
-				$this->execError($cTable);
+				$this->exec($cTable);
+				if($this->errorInfo()[0] != '00000') {
+					exit(str_replace(array(';'.chr(10), ';'), ';'.chr(10).$this->errorInfo()[0].' - '.$this->errorInfo()[2].chr(10), $cTable));
+				}
 			}
 		}
 	}
@@ -210,7 +213,7 @@ class PDOModel Extends PDO {
 					if(isset($params['lenght']) && strlen($var)>$params['lenght']) {
 						$var = substr($var, 0, $params['lenght']);
 					}
-					$var = PDO::QUOTE($var);
+					$var = '"'.addcslashes($var, '"').'"';
 				break;
 			}
 		}
@@ -286,7 +289,7 @@ class PDOModel Extends PDO {
 	}
 
 	static function rowExist($table, $key, $value) {
-		if ($res = $conn->query('SELECT COUNT(*) FROM `'.$table.'` WHERE '.$key.' =  '.PDO::quote($value)) && $res->fetchColumn() > 0) {
+		if ($res = $conn->query('SELECT COUNT(*) FROM `'.$table.'` WHERE '.$key.' =  "'.addcslashes($value, '"').'"') && $res->fetchColumn() > 0) {
 			return true;
 		}
 		return false;
@@ -341,11 +344,11 @@ class PDOModel Extends PDO {
 			return 0;
 
 		$query = $disabledSQLChecked ? 'SET @@session.unique_checks = 0; SET @@session.foreign_key_checks = 0;':'';
-		$query .= 'BEGIN;'
+		$query .= 'BEGIN;';
 		$query .= $lock ? 'LOCK TABLES '.implode(',',array_keys($this->tableInRows[$table])).';'.chr(10) : '';
 		$query .= $this->rows;
 		$query .= $lock ? 'UNLOCK TABLES;'.chr(10) : '';
-		$query .= 'COMMIT;'
+		$query .= 'COMMIT;';
 		$query = $disabledSQLChecked ? 'SET @@session.unique_checks = 1; SET @@session.foreign_key_checks = 1;':'';
 		$this->rows = '';
 		return $this->exec($query);
@@ -374,7 +377,12 @@ class PDOModel Extends PDO {
 
 	function select($table, $columns='*', $whereOrderLimit='') {
 		$q = 'SELECT '.$columns.' FROM `'.$table. '` ' .$whereOrderLimit;
-		return $this->_returnQuery ? $q : ($r=$this->query($q) ? $r->fetchAll() : array());
+		if($this->_returnQuery) {
+			return $q;
+		} else {
+			$r = $this->query($q);
+			return $r ? $r->fetchAll() : array();
+		}
 	}
 
 	function countRow($table = 'index', $where) {
