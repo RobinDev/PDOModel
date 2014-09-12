@@ -324,7 +324,7 @@ class PDOModel Extends PDO {
 		$query = ($replace===1?'REPLACE':'INSERT').($replace===2?' IGNORE':'').' INTO `'.$table.'` VALUES';
 
 		foreach($data as $d) {
-			$query .= '('.self::formatInsertValues($this->table[$tableName], $d).'),';
+			$query .= '('.self::formatInsertValues($this->table[$table], $d).'),';
 		}
 
 		$this->tableInRows[$table] = 1;
