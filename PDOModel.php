@@ -15,6 +15,7 @@ class PDOModel Extends PDO {
 		'user'=>userMysql,
 		'password'=>passwordMysql,
 		'host'=>'localhost',
+		//'port'=>3307,
 		'databasePath'=>'data/',
 		'alwaysCreateTable'=> true,
 	);
@@ -45,6 +46,8 @@ class PDOModel Extends PDO {
 
 	public $_returnQuery = false;
 
+	protected $prefix = '';
+
 	 public static function instance($dbname, $checkIfDatabaseExist=true) {
 		 $cls = get_called_class();
 		 $intance_name = $dbname.$cls;
@@ -65,13 +68,13 @@ class PDOModel Extends PDO {
 		// Connexion to Mysql host or Sqlite File
 		switch($this->config['dsn']) {
 			case 'sqlite' : $dsn = $this->config['databasePath'].$dbname; break;
-			case 'mysql'  : $dsn = 'mysql:host='.$this->config['host']; break;
+			case 'mysql'  : $dsn = 'mysql:host='.$this->config['host'].(isset($this->config['port']) ? ';port='.$this->config['port'] : ''); break;
 		}
 
 		parent::__construct($dsn, $this->config['user'], $this->config['password'],
 			array(
 				PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-				PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION//SILENT
+				PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
 			)
 		);
 
@@ -123,7 +126,7 @@ class PDOModel Extends PDO {
 		$table = $this->table;
 		if(!empty($table)) {
 			foreach($table as $t => $c) {
-				$cTable = 'CREATE TABLE IF NOT EXISTS `'.$t.'` ('.CHR(10);
+				$cTable = 'CREATE TABLE IF NOT EXISTS `'.$this->prefix.$t.'` ('.CHR(10);
 				foreach($c as $k => $v) {
 
 					if($k[0] == '#') {
@@ -145,8 +148,7 @@ class PDOModel Extends PDO {
 						$sV=$v; unset($v['type'], $v['lenght']);
 						foreach($v as $vk => $vv) {
 							if($vk === 'default') {
-								$cTable .= ' DEFAULT '.$this->formatValue($vv, $sV);
-
+								$cTable .= ' DEFAULT '.self::formatValue($vv, $sV);
 							} elseif($vk === 'references') {
 								$cTable .= ' REFERENCES '.$vv;
 							}
@@ -190,7 +192,7 @@ class PDOModel Extends PDO {
 		if(isset($params['type'])) {
 			if($var === '') {
 				if(in_array('auto_increment', $params)) return 'null';
-				if(isset($params['default'])) return self::formatValue($params['default'], $params);
+				if(isset($params['default'])) return $params['default'] == '' ? '""' : self::formatValue($params['default'], $params);
 			}
 			elseif($var === null) {
 				if(in_array('not null', $params)) return "''";
@@ -199,15 +201,15 @@ class PDOModel Extends PDO {
 			}
 			switch($params['type']) { //case 'timestamp' :
 				case 'bool' : 		$var = $var ? 1 : 0; 										break;
-				case 'datetime' : 	$var = PDO::QUOTE(date('Y-m-d H:i:s', strtotime($var))); 	break;
-				case 'date' :		$var = PDO::QUOTE(date('Y-m-d', strtotime($var))); 			break;
+				case 'datetime' : 	$var = '"'.date('Y-m-d H:i:s', strtotime($var)).'"'; 	break;
+				case 'date' :		$var = '"'.date('Y-m-d', strtotime($var)).'"'; 			break;
 				case 'integer' : case 'int' : case 'tinyint' : case 'smallint' : case 'bigint' :
 					$var = (int) $var;
 					break;
 				case 'float' : case 'decimal' :  case 'double' : case 'real' : case 'double precision' :
 					$var = floatval($var);
 					break;
-				case 'slugify' : 	$var = PDO::QUOTE(self::slugify($var)); 					break;
+				case 'slugify' : 	$var = '"'.self::slugify($var).'"'; 					break;
 				default :
 					// Découpe la variable si elle est plus longue que prévue dans le schéma de la table
 					if(isset($params['lenght']) && strlen($var)>$params['lenght']) {
@@ -256,12 +258,13 @@ class PDOModel Extends PDO {
 	 */
 	function edit($table, $data) {
 
-		//$columns = $this->table[$table];
-
 		if(isset($this->primaryKey[$table])) {
 			$pKey = $this->primaryKey[$table];
-			if((in_array('auto_increment', $pKey) && isset($data[$pKey])) || (!in_array('auto_increment', $pKey) && self::rowExist($table, $pKey, $data[$pKey]))) {
-				return $this->edit($table, $data, $pKey.' = '.PDO::QUOTE($data[$pKey]));
+			if(
+				(in_array('auto_increment', $this->table[$table][$pKey]) && isset($data[$pKey]))
+				 || (!in_array('auto_increment', $this->table[$table][$pKey]) && $this->rowExist($table, $pKey, $data[$pKey]))
+			  ) {
+				return $this->update($table, $data, $pKey.' = '.PDO::QUOTE($data[$pKey]));
 			}
 		}
 
@@ -277,19 +280,20 @@ class PDOModel Extends PDO {
 	 * @param int    $replace 0:Insert, 1:Replace, 2:Insert Ignore
 	 */
 	function insert($table, $data, $replace = 0) {
-		$query = ($replace===1?'REPLACE':'INSERT').($replace===2?' IGNORE':'').' INTO `'.$table.'` VALUES('.self::formatInsertValues($this->table[$table], $data).')';
+		$query = ($replace===1?'REPLACE':'INSERT').($replace===2?' IGNORE':'').' INTO `'.$this->prefix.$table.'` VALUES('.self::formatInsertValues($this->table[$table], $data).')';
 		//echo $query;
 		return $this->_returnQuery ? $query : $this->exec($query);
 	}
 
 	function update($table, $data, $where) {
-		$query = 'UPDATE `'.$able.'` SET '.self::formatUpdateSet($this->table[$table], $data).' WHERE '.$where;
-		//echo $query;
+		$query = 'UPDATE `'.$this->prefix.$table.'` SET '.self::formatUpdateSet($this->table[$table], $data).' WHERE '.$where;
+		echo $query;
 		return $this->_returnQuery ? $query : $this->exec($query);
 	}
 
-	static function rowExist($table, $key, $value) {
-		if ($res = $conn->query('SELECT COUNT(*) FROM `'.$table.'` WHERE '.$key.' =  "'.addcslashes($value, '"').'"') && $res->fetchColumn() > 0) {
+	function rowExist($table, $key, $value) {
+		$res = $this->query('SELECT COUNT(*) FROM `'.$this->prefix.$table.'` WHERE '.$key.' =  "'.addcslashes($value, '"').'"');
+		if ($res && $res->fetchColumn() > 0) {
 			return true;
 		}
 		return false;
@@ -321,7 +325,7 @@ class PDOModel Extends PDO {
 	 */
 	function massInsert($table, $datas, $replace) {
 
-		$query = ($replace===1?'REPLACE':'INSERT').($replace===2?' IGNORE':'').' INTO `'.$table.'` VALUES';
+		$query = ($replace===1?'REPLACE':'INSERT').($replace===2?' IGNORE':'').' INTO `'.$this->prefix.$table.'` VALUES';
 
 		foreach($data as $d) {
 			$query .= '('.self::formatInsertValues($this->table[$table], $d).'),';
@@ -355,20 +359,18 @@ class PDOModel Extends PDO {
 	}
 
 	// Benchmark the two way (prev & current) : exec vs prepare,execute
-	function execMassEditPlus($lockDB) {
+	function execMassEdit($lockDB=false) {
 		$this->rows = trim($this->rows);
 		if(!empty($this->rows)) {
-			if($lockDB != false) $this->exec('LOCK TABLES '.$lockDB.';');
-			//$s = $this->execError($this->rows);
+			if($lockDB !== false) $this->exec('LOCK TABLES '.$lockDB.';');
 			$s = $this->prepare($this->rows);
 			$s->execute();
 			$s->closeCursor();
-			if($lockDB != false) $this->exec('UNLOCK TABLES;');
+			if($lockDB !== false) $this->exec('UNLOCK TABLES;');
 			if($this->errorInfo()[0] != '00000') {
 				dbv($this->rows, false);
-				dbv('function execMassEditPlus', false);
-				dbv($this->errorInfo(), false);
-				exit;
+				dbv('function execMassEdit', false);
+				dbv($this->errorInfo());
 			}
 			$this->rows = '';
 			return $s->rowCount();
@@ -376,7 +378,7 @@ class PDOModel Extends PDO {
 	}
 
 	function select($table, $columns='*', $whereOrderLimit='') {
-		$q = 'SELECT '.$columns.' FROM `'.$table. '` ' .$whereOrderLimit;
+		$q = 'SELECT '.$columns.' FROM `'.$this->prefix.$table. '` ' .$whereOrderLimit;
 		if($this->_returnQuery) {
 			return $q;
 		} else {
@@ -386,7 +388,7 @@ class PDOModel Extends PDO {
 	}
 
 	function countRow($table = 'index', $where) {
-		return (int) $this->querySingle('SELECT COUNT(1) FROM `'.$table. '` ' .$where);
+		return (int) $this->queryOne('SELECT COUNT(1) FROM `'.$this->prefix.$table. '` ' .$where);
 	}
 
 	function queryOne($query) {
@@ -415,7 +417,7 @@ class PDOModel Extends PDO {
 		$toAlter = array();
 		foreach($this->table as $t => $v) {
 			$it = $t;
-			$t = (isset($this->prefix) && !empty($this->prefix) ? $this->prefix : '').$t;
+			//$t = (isset($this->prefix) && !empty($this->prefix) ? $this->prefix : '').$t;
 			$check = $this->query('CHECK TABLE `'.$t.'`')->fetchAll();
 			if($debug) echo 'CHECK TABLE `'.$t.'` ==> '.$check[0]['Msg_text'].CHR(10);
 			/**/
@@ -463,5 +465,15 @@ class PDOModel Extends PDO {
 		$str = preg_replace('`&([a-z]{1,2})(acute|uml|circ|grave|ring|cedil|slash|tilde|caron|lig);`i','$1',$str);
 		$str = preg_replace(array('`'.$authorized.'`i','`[-]+`'),'-',$str);
 		return strtolower(trim($str,'-'));
+	}
+
+	static function truncate($string, $max_length = 90, $replacement = '...', $trunc_at_space = false) {
+		$max_length -= strlen($replacement);
+		$string_length = strlen($string);
+		if($string_length <= $max_length)
+			return $string;
+		if( $trunc_at_space && ($space_position = strrpos($string, ' ', $max_length-$string_length)) )
+			$max_length = $space_position;
+		return substr_replace($string, $replacement, $max_length);
 	}
 }
