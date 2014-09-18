@@ -78,11 +78,11 @@ class PDOModel Extends PDO {
 			)
 		);
 
+		$this->dbname = $dbname;
+
 		if($checkIfDatabaseExist) {
 			$this->isDatabaseOk($dbname);
 		}
-
-		$this->dbname = $dbname;
 
 	}
 
@@ -186,7 +186,7 @@ class PDOModel Extends PDO {
 	/**
 	 * Compatibility with the MySQL/MariaDB STRICT_TRANS_TABLES sql-mode
 	 * // case 'varchar' : case 'char' :  case 'text' : case 'tinytext' : case 'mediumtext' : case 'longtext' : case 'binary' : case 'varbinary' : case 'tinyblob' : case 'blob' : case 'mediumblob' : case 'longblob' : case 'timestamp' :
-	 *
+	 * A supprimer ce putain de static !
 	 */
 	static function formatValue($var, $params) {
 		if(isset($params['type'])) {
@@ -196,7 +196,7 @@ class PDOModel Extends PDO {
 			}
 			elseif($var === null) {
 				if(in_array('not null', $params)) return "''";
-				if(isset($params['default'])) return $this->formatValue($params['default'], $params);
+				if(isset($params['default'])) return $params['default'] == '' ? '""' : self::formatValue($params['default'], $params);
 				return 'null';
 			}
 			switch($params['type']) { //case 'timestamp' :
@@ -210,6 +210,7 @@ class PDOModel Extends PDO {
 					$var = floatval($var);
 					break;
 				case 'slugify' : 	$var = '"'.self::slugify($var).'"'; 					break;
+				case 'binary' : 	$var = 'x\''.bin2hex($var).'\''; 						break;
 				default :
 					// Découpe la variable si elle est plus longue que prévue dans le schéma de la table
 					if(isset($params['lenght']) && strlen($var)>$params['lenght']) {
@@ -257,7 +258,6 @@ class PDOModel Extends PDO {
 	 * @return integer Nombre de lignes modifiées
 	 */
 	function edit($table, $data) {
-
 		if(isset($this->primaryKey[$table])) {
 			$pKey = $this->primaryKey[$table];
 			if(
@@ -281,7 +281,7 @@ class PDOModel Extends PDO {
 	 */
 	function insert($table, $data, $replace = 0) {
 		$query = ($replace===1?'REPLACE':'INSERT').($replace===2?' IGNORE':'').' INTO `'.$this->prefix.$table.'` VALUES('.self::formatInsertValues($this->table[$table], $data).')';
-		//echo $query;
+		//echo $query; echo chr(10);
 		return $this->_returnQuery ? $query : $this->exec($query);
 	}
 
@@ -323,7 +323,7 @@ class PDOModel Extends PDO {
 	 * @param array  $datas   [!]
 	 * @param int    $replace
 	 */
-	function massInsert($table, $datas, $replace) {
+	function massInsert($table, $data, $replace) {
 
 		$query = ($replace===1?'REPLACE':'INSERT').($replace===2?' IGNORE':'').' INTO `'.$this->prefix.$table.'` VALUES';
 
@@ -363,9 +363,10 @@ class PDOModel Extends PDO {
 		$this->rows = trim($this->rows);
 		if(!empty($this->rows)) {
 			if($lockDB !== false) $this->exec('LOCK TABLES '.$lockDB.';');
-			$s = $this->prepare($this->rows);
-			$s->execute();
-			$s->closeCursor();
+			$s = $this->exec($this->rows);
+			//$s = $this->prepare($this->rows);
+			//$s->execute();
+			//$s->closeCursor();
 			if($lockDB !== false) $this->exec('UNLOCK TABLES;');
 			if($this->errorInfo()[0] != '00000') {
 				dbv($this->rows, false);
@@ -373,7 +374,7 @@ class PDOModel Extends PDO {
 				dbv($this->errorInfo());
 			}
 			$this->rows = '';
-			return $s->rowCount();
+			return $s; //return $s->rowCount();
 		}
 	}
 
