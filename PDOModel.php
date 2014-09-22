@@ -133,7 +133,7 @@ class PDOModel Extends PDO {
 						if($k == '#INDEX#') {
 							$cTable .= 'INDEX('.$v.')';
 						}
-						elseif($k == '#fk') {
+						elseif(substr($k, 0, 3) == '#fk') {
 							foreach($v as $kk => $vv) {
 								$cTable .= self::createForeignKey($kk, $vv);
 							}
@@ -192,11 +192,11 @@ class PDOModel Extends PDO {
 		if(isset($params['type'])) {
 			if($var === '') {
 				if(in_array('auto_increment', $params)) return 'null';
-				if(isset($params['default'])) return $params['default'] == '' ? '""' : self::formatValue($params['default'], $params);
+				if(isset($params['default'])) return $params['default'] === '' ? '""' : self::formatValue($params['default'], $params);
 			}
 			elseif($var === null) {
 				if(in_array('not null', $params)) return "''";
-				if(isset($params['default'])) return $params['default'] == '' ? '""' : self::formatValue($params['default'], $params);
+				if(isset($params['default'])) return $params['default'] === '' ? '""' : self::formatValue($params['default'], $params);
 				return 'null';
 			}
 			switch($params['type']) { //case 'timestamp' :
@@ -236,9 +236,11 @@ class PDOModel Extends PDO {
 
 	static function formatInsertValues($keys, $data) {
 		$str = '';
-		foreach($keys as $k => $v)
-			if(strpos($k, '#') === false)
+		foreach($keys as $k => $v) {
+			if(strpos($k, '#') === false) {
 				$str .= self::formatValue( (isset($data[$k]) ? $data[$k] : null) , $v).',';
+			}
+		}
 		return rtrim($str, ',');
 	}
 
@@ -287,7 +289,7 @@ class PDOModel Extends PDO {
 
 	function update($table, $data, $where) {
 		$query = 'UPDATE `'.$this->prefix.$table.'` SET '.self::formatUpdateSet($this->table[$table], $data).' WHERE '.$where;
-		echo $query;
+		//echo $query;
 		return $this->_returnQuery ? $query : $this->exec($query);
 	}
 
