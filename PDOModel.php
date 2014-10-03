@@ -3,8 +3,6 @@
 namespace rOpenDev\PDOModel;
 use \PDO;
 
-// $this->errorInfo()[0]
-
 class PDOModel Extends PDO {
 
 	public $rows = '';
@@ -148,7 +146,7 @@ class PDOModel Extends PDO {
 						$sV=$v; unset($v['type'], $v['lenght']);
 						foreach($v as $vk => $vv) {
 							if($vk === 'default') {
-								$cTable .= ' DEFAULT '.self::formatValue($vv, $sV);
+								$cTable .= ' DEFAULT '.$this->formatValue($vv, $sV);
 							} elseif($vk === 'references') {
 								$cTable .= ' REFERENCES '.$vv;
 							}
@@ -186,17 +184,16 @@ class PDOModel Extends PDO {
 	/**
 	 * Compatibility with the MySQL/MariaDB STRICT_TRANS_TABLES sql-mode
 	 * // case 'varchar' : case 'char' :  case 'text' : case 'tinytext' : case 'mediumtext' : case 'longtext' : case 'binary' : case 'varbinary' : case 'tinyblob' : case 'blob' : case 'mediumblob' : case 'longblob' : case 'timestamp' :
-	 * A supprimer ce putain de static !
 	 */
-	static function formatValue($var, $params) {
+	function formatValue($var, $params) {
 		if(isset($params['type'])) {
 			if($var === '') {
 				if(in_array('auto_increment', $params)) return 'null';
-				if(isset($params['default'])) return $params['default'] === '' ? '""' : self::formatValue($params['default'], $params);
+				if(isset($params['default'])) return $params['default'] === '' ? '""' : $this->formatValue($params['default'], $params);
 			}
 			elseif($var === null) {
 				if(in_array('not null', $params)) return "''";
-				if(isset($params['default'])) return $params['default'] === '' ? '""' : self::formatValue($params['default'], $params);
+				if(isset($params['default'])) return $params['default'] === '' ? '""' : $this->formatValue($params['default'], $params);
 				return 'null';
 			}
 			switch($params['type']) { //case 'timestamp' :
@@ -216,38 +213,38 @@ class PDOModel Extends PDO {
 					if(isset($params['lenght']) && strlen($var)>$params['lenght']) {
 						$var = substr($var, 0, $params['lenght']);
 					}
-					$var = '"'.addcslashes($var, '"').'"';
+					$var = PDO::QUOTE($var);
 				break;
 			}
 		}
 		return $var;
 	}
 
-	static function formatUpdateSet($keys, $data) {
+	function formatUpdateSet($keys, $data) {
 		$str = '';
 		foreach($keys as $k => $v) {
 			// Garde les colonnes && les colonnes où il y a une donnée à mettre à jour
 			if(strpos($k, '#') === false && isset($data[$k])) {
-				$str .= '`'.$k.'` = '.self::formatValue($data[$k], $v).',';
+				$str .= '`'.$k.'` = '.$this->formatValue($data[$k], $v).',';
 			}
 		}
 		return rtrim($str, ',');
 	}
 
-	static function formatInsertValues($keys, $data) {
+	function formatInsertValues($keys, $data) {
 		$str = '';
 		foreach($keys as $k => $v) {
 			if(strpos($k, '#') === false) {
-				$str .= self::formatValue( (isset($data[$k]) ? $data[$k] : null) , $v).',';
+				$str .= $this->formatValue( (isset($data[$k]) ? $data[$k] : null) , $v).',';
 			}
 		}
 		return rtrim($str, ',');
 	}
 
 
-	static function formatIn($arr, $params) {
+	function formatIn($arr, $params) {
 		foreach($arr as $a)
-			$str = self::formatValue($a, $params).',';
+			$str = $this->formatValue($a, $params).',';
 		return '('.rtrim(',').')';
 	}
 
@@ -282,19 +279,19 @@ class PDOModel Extends PDO {
 	 * @param int    $replace 0:Insert, 1:Replace, 2:Insert Ignore
 	 */
 	function insert($table, $data, $replace = 0) {
-		$query = ($replace===1?'REPLACE':'INSERT').($replace===2?' IGNORE':'').' INTO `'.$this->prefix.$table.'` VALUES('.self::formatInsertValues($this->table[$table], $data).')';
+		$query = ($replace===1?'REPLACE':'INSERT').($replace===2?' IGNORE':'').' INTO `'.$this->prefix.$table.'` VALUES('.$this->formatInsertValues($this->table[$table], $data).')';
 		//echo $query; echo chr(10);
 		return $this->_returnQuery ? $query : $this->exec($query);
 	}
 
 	function update($table, $data, $where) {
-		$query = 'UPDATE `'.$this->prefix.$table.'` SET '.self::formatUpdateSet($this->table[$table], $data).' WHERE '.$where;
+		$query = 'UPDATE `'.$this->prefix.$table.'` SET '.$this->formatUpdateSet($this->table[$table], $data).' WHERE '.$where;
 		//echo $query;
 		return $this->_returnQuery ? $query : $this->exec($query);
 	}
 
 	function rowExist($table, $key, $value) {
-		$res = $this->query('SELECT COUNT(*) FROM `'.$this->prefix.$table.'` WHERE '.$key.' =  "'.addcslashes($value, '"').'"');
+		$res = $this->query('SELECT COUNT(*) FROM `'.$this->prefix.$table.'` WHERE '.$key.' =  '.PDO::QUOTE($value).'');
 		if ($res && $res->fetchColumn() > 0) {
 			return true;
 		}
@@ -330,7 +327,7 @@ class PDOModel Extends PDO {
 		$query = ($replace===1?'REPLACE':'INSERT').($replace===2?' IGNORE':'').' INTO `'.$this->prefix.$table.'` VALUES';
 
 		foreach($data as $d) {
-			$query .= '('.self::formatInsertValues($this->table[$table], $d).'),';
+			$query .= '('.$this->formatInsertValues($this->table[$table], $d).'),';
 		}
 
 		$this->tableInRows[$table] = 1;
