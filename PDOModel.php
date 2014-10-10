@@ -291,7 +291,7 @@ class PDOModel Extends PDO {
 	}
 
 	function rowExist($table, $key, $value) {
-		$res = $this->query('SELECT COUNT(*) FROM `'.$this->prefix.$table.'` WHERE '.$key.' =  '.PDO::QUOTE($value).'');
+		$res = $this->query('SELECT COUNT(*) FROM `'.$this->prefix.$table.'` WHERE '.$key.' =  '.PDO::QUOTE($value).' LIMIT 1');
 		if ($res && $res->fetchColumn() > 0) {
 			return true;
 		}
