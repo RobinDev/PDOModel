@@ -46,7 +46,10 @@ class PDOModel Extends PDO {
 
 	protected $prefix = '';
 
-	 public static function instance($dbname, $checkIfDatabaseExist=true) {
+	/**
+	 * Changer $checkIfDatabaseExist à false par défault !
+	 */
+	public static function instance($dbname, $checkIfDatabaseExist=false) {
 		 $cls = get_called_class();
 		 $intance_name = $dbname.$cls;
 		if(!isset(self::$instance[$intance_name]))
@@ -79,7 +82,9 @@ class PDOModel Extends PDO {
 		$this->dbname = $dbname;
 
 		if($checkIfDatabaseExist) {
-			$this->isDatabaseOk($dbname);
+			$this->createDatabase();
+		} else {
+			$this->exec('USE `'.$this->dbname.'`');
 		}
 
 	}
@@ -88,13 +93,15 @@ class PDOModel Extends PDO {
 	 * Check if the database exist else create it.
 	 *
 	 */
-	protected function isDatabaseOk($dbname) {
+	function createDatabase() {
+
+		$dbname = $this->dbname;
 
 		switch($this->config['dsn']) {
 
 			case 'sqlite' :
 				if(empty($this->query('SELECT name FROM sqlite_master')->fetchAll())) {
-					$this->createTable();
+					return $this->createTable();
 				}
 				break;
 
@@ -108,8 +115,9 @@ class PDOModel Extends PDO {
 				break;
 		}
 
-		if($this->config['alwaysCreateTable'])
+		if($this->config['alwaysCreateTable']) {
 			$this->createTable();
+		}
 	}
 
 	static function normalizeType($type) {
@@ -130,6 +138,9 @@ class PDOModel Extends PDO {
 					if($k[0] == '#') {
 						if($k == '#INDEX#') {
 							$cTable .= 'INDEX('.$v.')';
+						}
+						elseif(strpos($k, '#k') === 0) {
+							$cTable .= 'KEY '.$v; // KEY keyName (column_name [,column_name...]),
 						}
 						elseif(substr($k, 0, 3) == '#fk') {
 							foreach($v as $kk => $vv) {
@@ -400,6 +411,18 @@ class PDOModel Extends PDO {
 			elseif($result !== false)
 				return $result;
 		}
+	}
+
+	/**
+	 * Charge une association clef/valeur pour une table donnée
+	 */
+	function load($key,$value,$table) {
+		$return = [];
+		$exec=$this->query('SELECT `'.$key.'`'.($value!==null ? ',`'.$value.'`':'').' FROM `'.$this->prefix.$table. '`');
+		while($d=$exec->fetch()) {
+			$return[$d[$key]] = $value === null ? 1 : $d[$value];
+		}
+		return $return;
 	}
 
 	/***** DEPRECATED ******/
