@@ -75,7 +75,9 @@ class PDOModel Extends PDO {
 		parent::__construct($dsn, $this->config['user'], $this->config['password'],
 			array(
 				PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-				PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
+				PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+				PDO::ATTR_STRINGIFY_FETCHES => false,
+				PDO::ATTR_EMULATE_PREPARES => false,
 			)
 		);
 
@@ -415,14 +417,11 @@ class PDOModel Extends PDO {
 
 	/**
 	 * Charge une association clef/valeur pour une table donnée
+	 *
+	 * @return array
 	 */
 	function load($key,$value,$table) {
-		$return = [];
-		$exec=$this->query('SELECT `'.$key.'`'.($value!==null ? ',`'.$value.'`':'').' FROM `'.$this->prefix.$table. '`');
-		while($d=$exec->fetch()) {
-			$return[$d[$key]] = $value === null ? 1 : $d[$value];
-		}
-		return $return;
+		return (array) $this->query('SELECT `'.$key.'`'.($value!==null ? ',`'.$value.'`':',1').' FROM `'.$this->prefix.$table. '`')->fetchAll(PDO::FETCH_KEY_PAIR);
 	}
 
 	/***** DEPRECATED ******/
