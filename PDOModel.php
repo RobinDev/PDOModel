@@ -404,6 +404,7 @@ class PDOModel Extends PDO {
 		return (int) $this->queryOne('SELECT COUNT(1) FROM `'.$this->prefix.$table. '` ' .$where);
 	}
 
+	/** Deprecated **/
 	function queryOne($query) {
 		$query = $this->query($query);
 		if(is_object($query)) {
@@ -420,8 +421,9 @@ class PDOModel Extends PDO {
 	 *
 	 * @return array
 	 */
-	function load($key,$value,$table) {
-		return (array) $this->query('SELECT `'.$key.'`'.($value!==null ? ',`'.$value.'`':',1').' FROM `'.$this->prefix.$table. '`')->fetchAll(PDO::FETCH_KEY_PAIR);
+	function load($key,$value,$table)
+	{
+		return (array) $this->query('SELECT DISTINCT `'.$key.'`'.($value!==null ? ',`'.$value.'`':',1').' FROM `'.$this->prefix.$table. '`')->fetchAll(PDO::FETCH_KEY_PAIR);
 	}
 
 	/***** DEPRECATED ******/
@@ -479,23 +481,28 @@ class PDOModel Extends PDO {
 
 	}
 
-	static function slugify($str, $authorized = '[^a-z0-9/\.]') {
+	public static function slugify($str, $authorized = '[^a-z0-9/\.]')
+	{
 		$str = str_replace(array('\'', '"'),'',$str);
-		if($str !== mb_convert_encoding(mb_convert_encoding($str,'UTF-32','UTF-8'),'UTF-8','UTF-32'))
+		if($str !== mb_convert_encoding(mb_convert_encoding($str,'UTF-32','UTF-8'),'UTF-8','UTF-32')) {
 			$str = mb_convert_encoding($str,'UTF-8');
+		}
 		$str = htmlentities($str,ENT_NOQUOTES,'UTF-8');
 		$str = preg_replace('`&([a-z]{1,2})(acute|uml|circ|grave|ring|cedil|slash|tilde|caron|lig);`i','$1',$str);
 		$str = preg_replace(array('`'.$authorized.'`i','`[-]+`'),'-',$str);
 		return strtolower(trim($str,'-'));
 	}
 
-	static function truncate($string, $max_length = 90, $replacement = '...', $trunc_at_space = false) {
+	public static function truncate($string, $max_length = 90, $replacement = '...', $trunc_at_space = false)
+	{
 		$max_length -= strlen($replacement);
 		$string_length = strlen($string);
-		if($string_length <= $max_length)
+		if($string_length <= $max_length) {
 			return $string;
-		if( $trunc_at_space && ($space_position = strrpos($string, ' ', $max_length-$string_length)) )
+		}
+		if ($trunc_at_space && ($space_position = strrpos($string, ' ', $max_length-$string_length))) {
 			$max_length = $space_position;
+		}
 		return substr_replace($string, $replacement, $max_length);
 	}
 }
