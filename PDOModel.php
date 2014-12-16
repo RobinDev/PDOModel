@@ -1,14 +1,18 @@
 <?php
-
 namespace rOpenDev\PDOModel;
+
 use \PDO;
 
 class PDOModel Extends PDO {
 
+	/** @var string contain next requests **/
 	public $rows = '';
-	public $tableInRows = array();
 
-	protected $config = array(
+	/** @var array ? **/
+	public $tableInRows = [];
+
+	/** @var array Config **/
+	protected $config = [
 		'dsn'=>'mysql',
 		'user'=>userMysql,
 		'password'=>passwordMysql,
@@ -16,12 +20,14 @@ class PDOModel Extends PDO {
 		//'port'=>3307,
 		'databasePath'=>'data/',
 		'alwaysCreateTable'=> true,
-	);
+	];
 
-	private static $instance = null;
+	/** @var object's array Contain opened connexion (pdolink) **/
+	private static $instance;
 
-	protected $colParams = array(
-		'mysql' => array(
+	/** @var array Contain params relative to the motor **/
+	protected $colParams = [
+		'mysql' => [
 			'NULL',
 			'NOT NULL',
 			'AUTO_INCREMENT',
@@ -30,26 +36,33 @@ class PDOModel Extends PDO {
 			'UNIQUE',
 			// references
 			// default
-		),
-		'sqlite'=> array(
+		],
+		'sqlite'=> [
 			'NULL',
 			'NOT NULL',
 			'UNIQUE',
 			'PRIMARY KEY',
 			// check
 			// default
+		]
+	];
 
-		)
-	);
-
+	/** @var bool **/
 	public $_returnQuery = false;
 
+	/** var string **/
 	protected $prefix = '';
 
 	/**
 	 * Changer $checkIfDatabaseExist à false par défault !
+	 *
+	 * @param string $dbname
+	 * @param bool   $checkIfDatabaseExist
+	 *
+	 * @return self (PDO Link corresponding to the called class)
 	 */
-	public static function instance($dbname, $checkIfDatabaseExist=false) {
+	public static function instance($dbname, $checkIfDatabaseExist=false)
+	{
 		 $cls = get_called_class();
 		 $intance_name = $dbname.$cls;
 		if(!isset(self::$instance[$intance_name]))
@@ -57,15 +70,27 @@ class PDOModel Extends PDO {
 		return self::$instance[$intance_name];
 	}
 
-	public static function close_instance($dbname) {
+	/**
+	 * Close the pdo connexion
+	 *
+	 * @param string $dbname
+	 */
+	public static function close_instance($dbname)
+	{
 		$cls = get_called_class();
 		$intance_name = $dbname.$cls;
 		self::$instance[$intance_name] = null;
 		unset(self::$instance[$intance_name]);
 	}
 
-	function __construct($dbname = 'default', $checkIfDatabaseExist=true) {
-
+	/**
+	 * Constructor
+	 *
+	 * @param string $dbname
+	 * @param bool   $checkIfDatabaseExist
+	 */
+	function __construct($dbname = 'default', $checkIfDatabaseExist=true)
+	{
 		// Connexion to Mysql host or Sqlite File
 		switch($this->config['dsn']) {
 			case 'sqlite' : $dsn = $this->config['databasePath'].$dbname; break;
@@ -95,8 +120,8 @@ class PDOModel Extends PDO {
 	 * Check if the database exist else create it.
 	 *
 	 */
-	function createDatabase() {
-
+	function createDatabase()
+	{
 		$dbname = $this->dbname;
 
 		switch($this->config['dsn']) {
@@ -122,7 +147,8 @@ class PDOModel Extends PDO {
 		}
 	}
 
-	static function normalizeType($type) {
+	static function normalizeType($type)
+	{
 		switch($type) {
 			case 'slugify' : 	return 'varchar';
 			case 'bool' : 		return 'bit';
@@ -130,7 +156,11 @@ class PDOModel Extends PDO {
 		}
 	}
 
-	function createTable() {
+	/**
+	 * Query constructor for create table (and exec)
+	 */
+	function createTable()
+	{
 		$table = $this->table;
 		if(!empty($table)) {
 			foreach($table as $t => $c) {
@@ -181,24 +211,41 @@ class PDOModel Extends PDO {
 		}
 	}
 
-	static function createForeignKey($refTable, $params) {
-		// FOREIGN KEY [id] (index_col_name, ...)
-		//	REFERENCES tbl_name (index_col_name, ...)
-		// 	[ON DELETE {CASCADE | SET NULL | NO ACTION | RESTRICT}]
-		//	[ON UPDATE {CASCADE | SET NULL | NO ACTION | RESTRICT}]
+	/**
+	 * Foreign key part generator for query constructor
+	 *
+	 * @param string $refTable
+	 * @param array  $params
+	 *
+	 * @return string
+	 */
+	static function createForeignKey($refTable, $params)
+	{
 		return 'FOREIGN KEY ('.implode(',',$params[0]).') REFERENCES '.$refTable.'('.implode(',',$params[1]).') '.strtoupper($params[2]);
 	}
 
-	static function createPrimaryKey($columns) {
-		// PRIMARY KEY [index_type] (index_col_name,...)
+	/**
+	 * Primary key part generator
+	 *
+	 * @param array $columns wich are primary keys
+	 *
+	 * @return string
+	 */
+	static function createPrimaryKey($columns)
+	{
 		return 'PRIMARY KEY ('.implode(',',$columns).')';
 	}
 
 	/**
-	 * Compatibility with the MySQL/MariaDB STRICT_TRANS_TABLES sql-mode
-	 * // case 'varchar' : case 'char' :  case 'text' : case 'tinytext' : case 'mediumtext' : case 'longtext' : case 'binary' : case 'varbinary' : case 'tinyblob' : case 'blob' : case 'mediumblob' : case 'longblob' : case 'timestamp' :
+	 * Format value
+	 *
+	 * @param string $var
+	 * @param array  $params column SQL
+	 *
+	 * @return string ready for insert/update
 	 */
-	function formatValue($var, $params) {
+	function formatValue($var, $params)
+	{
 		if(isset($params['type'])) {
 			if($var === '') {
 				if(in_array('auto_increment', $params)) return 'null';
@@ -233,6 +280,14 @@ class PDOModel Extends PDO {
 		return $var;
 	}
 
+	/**
+	 * Format update set
+	 *
+	 * @param array $keys
+	 * @param array $data
+	 *
+	 * @return string
+	 */
 	function formatUpdateSet($keys, $data) {
 		$str = '';
 		foreach($keys as $k => $v) {
@@ -244,7 +299,16 @@ class PDOModel Extends PDO {
 		return rtrim($str, ',');
 	}
 
-	function formatInsertValues($keys, $data) {
+	/**
+	 * Format insert values
+	 *
+	 * @param array $keys
+	 * @param array $data
+	 *
+	 * @return string
+	 */
+	public function formatInsertValues($keys, $data)
+	{
 		$str = '';
 		foreach($keys as $k => $v) {
 			if(strpos($k, '#') === false) {
@@ -255,21 +319,32 @@ class PDOModel Extends PDO {
 	}
 
 
-	function formatIn($arr, $params) {
-		foreach($arr as $a)
+	/**
+	 * Format in values
+	 *
+	 * @param array $arr
+	 * @param array $params
+	 *
+	 * @return string
+	 */
+	public function formatIn($arr, $params)
+	{
+		foreach($arr as $a) {
 			$str = $this->formatValue($a, $params).',';
+		}
 		return '('.rtrim(',').')';
 	}
 
 	/**
-	 * Persiter une ligne
+	 * Persit a row (insert or update if exist)
 	 *
-	 * @param string $table La table dans laquelle les données seront persistées
-	 * @param array $data   Les données
+	 * @param string $table  La table dans laquelle les données seront persistées
+	 * @param array  $data   Les données
 	 *
-	 * @return integer Nombre de lignes modifiées
+	 * @return int Nombre de lignes modifiées
 	 */
-	function edit($table, $data) {
+	public function edit($table, $data)
+	{
 		if(isset($this->primaryKey[$table])) {
 			$pKey = $this->primaryKey[$table];
 			if(
@@ -286,29 +361,49 @@ class PDOModel Extends PDO {
 	}
 
 	/*
+	 * Insert a row
 	 *
 	 * @param string $table
 	 * @param array  $data
-	 * @param int    $replace 0:Insert, 1:Replace, 2:Insert Ignore
+	 * @param int    $replace 0: INSERT, 1: REPLACE, 2: INSERT IGNORE
+	 *
+	 * @return mixed
 	 */
-	function insert($table, $data, $replace = 0) {
+	function insert($table, $data, $replace = 0)
+	{
 		$query = ($replace===1?'REPLACE':'INSERT').($replace===2?' IGNORE':'').' INTO `'.$this->prefix.$table.'` VALUES('.$this->formatInsertValues($this->table[$table], $data).')';
 		//echo $query; echo chr(10);
 		return $this->_returnQuery ? $query : $this->exec($query);
 	}
 
-	function update($table, $data, $where) {
+	/**
+	 * Update a row
+	 *
+	 * @param string $table
+	 * @param array  $data
+	 * @param string $where
+	 *
+	 * @return mixed
+	 */
+	function update($table, $data, $where)
+	{
 		$query = 'UPDATE `'.$this->prefix.$table.'` SET '.$this->formatUpdateSet($this->table[$table], $data).' WHERE '.$where;
-		//echo $query;
 		return $this->_returnQuery ? $query : $this->exec($query);
 	}
 
-	function rowExist($table, $key, $value) {
+	/**
+	 * Test if a row exist
+	 *
+	 * @param string $table
+	 * @param string $key
+	 * @param string $value Will be wuoted
+	 *
+	 * @return bool
+	 */
+	function rowExist($table, $key, $value)
+	{
 		$res = $this->query('SELECT COUNT(*) FROM `'.$this->prefix.$table.'` WHERE '.$key.' =  '.PDO::QUOTE($value).' LIMIT 1');
-		if ($res && $res->fetchColumn() > 0) {
-			return true;
-		}
-		return false;
+		return $res && $res->fetchColumn() > 0 ? true : false;
 	}
 
 	/**
@@ -316,27 +411,32 @@ class PDOModel Extends PDO {
 	 *
 	 * @param string $table
 	 * @param array  $data
-	 * @param int    $replace
+	 * @param int    $replace 0: INSERT, 1: REPLACE, 2: INSERT IGNORE
+	 *
+	 * @return self
 	 */
-	function massEdit($table, $data, $replace=0) {//$tableName = 'index', $forceInsert = false, $whereUpdate = '') {
+	function massEdit($table, $data, $replace=0)
+	{
 		$this->_returnQuery = true;
-		if($replace>0)
-			$this->rows .= $this->insert($table, $data, $replace).';'.CHR(10);
-		else
-			$this->rows .= $this->edit($table, $data).';'.CHR(10);
+		$this->rows .= $replace>0 ? $this->insert($table, $data, $replace).';' : $this->edit($table, $data).';';
 		$this->tableInRows[$table] = 1;
 		$this->_returnQuery = false;
+
+		return $this;
 	}
 
 	/**
 	 * Prépare dans la valriable $this->rows, une requête insérant plusieurs lignes
 	 *
 	 * @param string $table
-	 * @param array  $datas   [!]
-	 * @param int    $replace
+	 * @param array  $data    !Attention, doit contenir plusieurs ligne sinon utiliser self::massEdit()
+	 *                        Nécessite tout les champs de la table pour chaque ligne (si plus, ils seront enlevés... si moins = erreur lors de l'execution)
+	 * @param int    $replace 0: INSERT, 1: REPLACE, 2: INSERT IGNORE
+	 *
+	 * @return self
 	 */
-	function massInsert($table, $data, $replace) {
-
+	function massInsert($table, $data, $replace)
+	{
 		$query = ($replace===1?'REPLACE':'INSERT').($replace===2?' IGNORE':'').' INTO `'.$this->prefix.$table.'` VALUES';
 
 		foreach($data as $d) {
@@ -345,63 +445,83 @@ class PDOModel Extends PDO {
 
 		$this->tableInRows[$table] = 1;
 		$this->rows .= trim($query, ',').';';
+
+		return $this;
 	}
 
 	/**
-	 * Execute sql queries prepared in $this->rows
+	 * Exec requests contained in self::$rows
 	 *
-	 * @param bool   $lock Lock the table requested
-	 * @param bool   $disabledSQLChecked Disabled unique check and foreign check
+	 * @param mixed $lockDB            FALSE if there isn't need lock else STRING `table WRITE[, table2 READ[,...]]`
+	 * @param bool  $disableSQLChecked Disable foreign key and unique MySQL Checks
 	 *
-	 * @return integer Nombre de lignes modifiées
+	 * @throws Exception if there is an error during the request
+	 *
+	 * @return int Number of modified rows
 	 */
-	function execRows($lock = false, $disabledSQLChecked=false) {
+	function execMassEdit($lockDB=false, $disableSQLChecked=false)
+	{
 		if(empty($this->rows))
 			return 0;
 
-		$query = $disabledSQLChecked ? 'SET @@session.unique_checks = 0; SET @@session.foreign_key_checks = 0;':'';
-		$query .= 'BEGIN;';
-		$query .= $lock ? 'LOCK TABLES '.implode(',',array_keys($this->tableInRows[$table])).';'.chr(10) : '';
-		$query .= $this->rows;
-		$query .= $lock ? 'UNLOCK TABLES;'.chr(10) : '';
-		$query .= 'COMMIT;';
-		$query = $disabledSQLChecked ? 'SET @@session.unique_checks = 1; SET @@session.foreign_key_checks = 1;':'';
-		$this->rows = '';
-		return $this->exec($query);
-	}
-
-	// Benchmark the two way (prev & current) : exec vs prepare,execute
-	function execMassEdit($lockDB=false) {
-		$this->rows = trim($this->rows);
-		if(!empty($this->rows)) {
-			if($lockDB !== false) $this->exec('LOCK TABLES '.$lockDB.';');
-			$s = $this->exec($this->rows);
-			//$s = $this->prepare($this->rows);
-			//$s->execute();
-			//$s->closeCursor();
-			if($lockDB !== false) $this->exec('UNLOCK TABLES;');
-			if($this->errorInfo()[0] != '00000') {
-				dbv($this->rows, false);
-				dbv('function execMassEdit', false);
-				dbv($this->errorInfo());
-			}
-			$this->rows = '';
-			return $s; //return $s->rowCount();
+		if ($disableSQLChecked) {
+			$this->exec('SET @@session.unique_checks = 0; SET @@session.foreign_key_checks = 0;');
 		}
+
+		if ($lockDB !== false) {
+			$this->exec('LOCK TABLES '.$lockDB.';');
+		}
+
+		$s = $this->exec('BEGIN;'.$this->rows.'COMMIT;');
+
+		if ($lockDB !== false) {
+			$this->exec('UNLOCK TABLES;');
+		}
+
+		if ($disableSQLChecked) {
+			$this->exec('SET @@session.unique_checks = 1; SET @@session.foreign_key_checks = 1;');
+		}
+
+		if($this->errorInfo()[0] != '00000') {
+			throw new Exception(get_called_class().'::execMassEdit() [ERROR] '.$this->errorInfo()[0]);
+		}
+
+		$this->rows = '';
+		return $s; //return $s->rowCount();
 	}
 
-	function select($table, $columns='*', $whereOrderLimit='') {
+
+	/**
+	 * Select
+	 *
+	 * @param string $table
+	 * @param string $columns
+	 * @param string $whereOrderLimit & co
+	 *
+	 * @return array
+	 */
+	function select($table, $columns='*', $whereOrderLimit='')
+	{
 		$q = 'SELECT '.$columns.' FROM `'.$this->prefix.$table. '` ' .$whereOrderLimit;
 		if($this->_returnQuery) {
 			return $q;
 		} else {
 			$r = $this->query($q);
-			return $r ? $r->fetchAll() : array();
+			return $r ? $r->fetchAll() : [];
 		}
 	}
 
-	function countRow($table = 'index', $where) {
-		return (int) $this->queryOne('SELECT COUNT(1) FROM `'.$this->prefix.$table. '` ' .$where);
+	/**
+	 * Count the number of rows in a table
+	 *
+	 * @param string $table
+	 * @param string $afterFrom (where, group by, have...)
+	 *
+	 * @return int
+	 */
+	function countRow($table = 'index', $afterFrom)
+	{
+		return (int) $this->queryOne('SELECT COUNT(1) FROM `'.$this->prefix.$table. '` ' .$afterFrom);
 	}
 
 	/** Deprecated **/
@@ -419,66 +539,31 @@ class PDOModel Extends PDO {
 	/**
 	 * Charge une association clef/valeur pour une table donnée
 	 *
+	 * @param string $key
+	 * @param string $value If value is not set, `1` will be set to replace it
+	 * @param string $table
+	 *
 	 * @return array
 	 */
-	function load($key,$value,$table)
+	function load($key,$value=null,$table)
 	{
 		return (array) $this->query('SELECT DISTINCT `'.$key.'`'.($value!==null ? ',`'.$value.'`':',1').' FROM `'.$this->prefix.$table. '`')->fetchAll(PDO::FETCH_KEY_PAIR);
 	}
 
-	/***** DEPRECATED ******/
+	/**
+	 * Optimize table from selected database
+	 * MySQL only
+	 *
+	 * @return array Containing results from the requests (key is the table name `database.tablename` and value is a string returned by MySQL
+	 */
 	function optimize() {
+		$results = [];
 		$dbs = $this->query('SELECT TABLE_SCHEMA, TABLE_NAME FROM information_schema.TABLES  WHERE TABLE_TYPE=\'BASE TABLE\'')->fetchAll(PDO::FETCH_NUM);
 		foreach($dbs as $t) {
-				$r = $this->query('OPTIMIZE TABLE `'.$t[0].'`.`'.$t[1].'`')->fetch() or die($t[1]);
-				$this->query('ALTER TABLE `'.$t[0].'`.`'.$t[1].'`');
-				echo $t[0].'.'.$t[1].' : '.$r['Msg_text'].'<br>';
-			}
-	}
-
-	/***** DEPRECATED ******/
-	function repair($debug = true) {
-		$toAlter = array();
-		foreach($this->table as $t => $v) {
-			$it = $t;
-			//$t = (isset($this->prefix) && !empty($this->prefix) ? $this->prefix : '').$t;
-			$check = $this->query('CHECK TABLE `'.$t.'`')->fetchAll();
-			if($debug) echo 'CHECK TABLE `'.$t.'` ==> '.$check[0]['Msg_text'].CHR(10);
-			/**/
-			$dbSize = (int) $this->query('SELECT round(((data_length + index_length) / 1024 / 1024), 0) FROM information_schema.TABLES WHERE table_schema = '.PDO::quote($this->dbname).' AND table_name = '.PDO::QUOTE($t))->fetchColumn();
-			if($dbSize<400) { /// TMP . PUT 1000
-				$sql = 'ALTER TABLE `'.$t.'` ENGINE = InnoDB';
-				$check = $this->exec($sql);
-				if($debug) echo $sql.CHR(10);
-			} elseif(strpos(serialize($v), 'primary key') !== false) {
-				$cmd = 'pt-online-schema-change --host "localhost"  --user "'.$this->user.'"  --password "'.$this->password.'" --alter "ENGINE=InnoDB" --execute D='.$this->dbname.',t='.$t;
-				exec("sh -c \" $cmd 2>&1 \"");
-				if($debug) echo $cmd.CHR(10);
-			} /**
-			else {
-				$this->createTable(array($it.'_new'=>$v));
-				$this->exec('LOCK TABLES `'.$t.'` WRITE, `'.$t.'_new` WRITE;');
-				while(1<2) {
-					$q = $this->query('SELECT * FROM `'.$t.'` LIMIT 0, 1000;');
-					if(!$q) break;
-					$q = $q->fetchAll();
-					if(empty($q)) break;
-					$this->massInsert($q, $it, true);
-					//$this->rows = str_replace('`'.$t.'`', '`'.$t.'_new`', $this->rows);
-					$this->rows = substr_replace($this->rows, '`'.$t.'_new`', strpos($this->rows, '`'.$t.'`'), strlen('`'.$t.'`'));
-					foreach($q as $r)
-						$this->rows .= 'DELETE FROM `'.$t.'` WHERE '.$this->formatUpdateSet($v, $r, ' AND ').' LIMIT 1;'.CHR(10);
-					//dbv($this->rows, false);
-					$this->executeMassEdit();
-					$this->exec('FLUSH TABLE `'.$t.'`');
-					$this->exec('FLUSH TABLE `'.$t.'_new`');
-				}
-				$this->execError('DROP TABLE `'.$t.'`');
-				$this->execError('RENAME TABLE `'.$this->dbname.'`.`'.$t.'_new` TO `'.$this->dbname.'`.`'.$t.'` ;');
-				if($debug) echo 'ALTER Line Per Line '.$t.'  ==> OK'.CHR(10);
-			} /**/
+			$r = $this->query('OPTIMIZE TABLE `'.$t[0].'`.`'.$t[1].'`')->fetch();
+			$results[$t[0].'.'.$t[1]] = $r['Msg_text'];
 		}
-
+		return $results;
 	}
 
 	public static function slugify($str, $authorized = '[^a-z0-9/\.]')
