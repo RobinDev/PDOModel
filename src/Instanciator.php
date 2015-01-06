@@ -41,6 +41,8 @@ trait Instanciator
             self::$instance[$intance_name] = new $cls($dbname, $checkIfDatabaseExist);
         }
 
+        self::$instance[$intance_name]->exec('USE `'.$dbname.'`');
+
         return self::$instance[$intance_name];
     }
 
