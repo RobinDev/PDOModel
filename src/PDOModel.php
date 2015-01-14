@@ -245,7 +245,7 @@ class PDOModel //extends PDO
      */
     public function rowExist($table, $key, $value)
     {
-        $res = $this->query('SELECT COUNT(*) FROM `'.$this->prefix.$table.'` WHERE '.$key.' =  '.PDO::QUOTE($value).' LIMIT 1');
+        $res = $this->query('SELECT COUNT(*) FROM `'.$this->prefix.$table.'` WHERE '.$key.' =  '.$this->quote($value).' LIMIT 1');
 
         return $res && $res->fetchColumn() > 0 ? true : false;
     }
